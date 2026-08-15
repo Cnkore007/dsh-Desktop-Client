@@ -3,6 +3,15 @@
   "private": true,
   "version": "0.1.1",
   "description": "DeepSeek Harness Desktop Client — a modern desktop client for DeepSeek Harness (original Tauri shell)",
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek-harness",
+    "deepseek",
+    "desktop-client",
+    "tauri",
+    "cordis"
+  ],
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",

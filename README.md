@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/Cnkore007/dsh-Desktop-Client/releases"><img src="https://img.shields.io/github/v/release/Cnkore007/dsh-Desktop-Client?color=blue&label=Release" alt="Release Version"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/Topic-dsh--plugin-0969da?logo=github" alt="dsh-plugin Topic"></a>
   <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/Official%20dsh-0.1.0--rc.6-brightgreen" alt="Official dsh"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License"></a>
 </p>
@@ -62,9 +63,11 @@
 1. **官方架构与生态协同**：
    - 官方核心项目：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
    - 严格遵循零侵入官方源码原则，与官方 CLI 及数据配置（`$DSH_HOME`）保持 100% 互通兼容。
-2. **扩展与贡献**：
-   - 欢迎提交 Issue 反馈问题、优化建议或提交 Pull Request；
-   - 欢迎社区开发者接入外部 MCP (Model Context Protocol) 服务（如 GitHub、PostgreSQL、本地文件系统）与 Cordis 插件。
+2. **GitHub [`dsh-plugin`](https://github.com/topics/dsh-plugin) 生态探索**：
+   - 本项目已加入 GitHub [`dsh-plugin`](https://github.com/topics/dsh-plugin) 社区生态主题；
+   - 欢迎社区开发者接入外部 MCP (Model Context Protocol) 工具与自定义 Cordis 插件扩展。
+3. **扩展与贡献**：
+   - 欢迎提交 Issue 反馈问题、优化建议或提交 Pull Request。
 
 ---
 
