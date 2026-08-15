@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DSh Desktop 控制台</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g)"/>
+          <path d="M20 22 L38 32 L20 42" stroke="#f8fafc" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="20" y="46" width="22" height="5" rx="2.5" fill="#f8fafc"/>
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#1e1b4b"/>
+              <stop offset="1" stop-color="#6d28d9"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div>
+          <h1>DSh Desktop</h1>
+          <p class="subtitle">DeepSeek Harness 桌面客户端 · 控制台</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="version" class="badge">v0.1.0</span>
+        <button id="check-update" class="ghost" title="检查 GitHub Releases 新版本">检查更新</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card status-card">
+        <div class="status-head">
+          <span id="status-dot" class="dot stopped"></span>
+          <span id="status-label" class="status-label">检测中…</span>
+        </div>
+        <div class="status-details">
+          <div class="kv"><span>端口</span><code id="kv-port">—</code></div>
+          <div class="kv"><span>进程 PID</span><code id="kv-pid">—</code></div>
+          <div class="kv"><span>dsh 版本</span><code id="kv-dsh">—</code></div>
+          <div class="kv"><span>数据目录</span><code id="kv-data">—</code></div>
+        </div>
+        <div id="error-box" class="error-box hidden"></div>
+      </section>
+
+      <section class="card actions-card">
+        <button id="btn-start" class="primary" disabled>启动服务</button>
+        <button id="btn-restart" disabled>重启服务</button>
+        <button id="btn-stop" disabled>停止服务</button>
+        <button id="btn-open" disabled>打开界面</button>
+        <button id="btn-browser">在浏览器打开</button>
+        <button id="btn-data">打开数据目录</button>
+      </section>
+
+      <section class="card settings-card">
+        <label class="switch-row">
+          <span>
+            <strong>开机自启</strong>
+            <small>登录系统后自动启动 DSh Desktop</small>
+          </span>
+          <input id="autostart" type="checkbox" />
+        </label>
+      </section>
+
+      <section class="card log-card">
+        <div class="log-head">
+          <h2>服务日志</h2>
+          <button id="btn-clear-log" class="ghost">清空</button>
+        </div>
+        <pre id="log-view" class="log-view"></pre>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span id="foot-status"></span>
+      <span>数据存储于 <code>~/.dsh</code>，与官方 CLI 兼容</span>
+    </footer>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
