@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # 审计 H8：第三方 actions 按 commit SHA 钉死（Dependabot 自动更新 SHA）
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (target)
         # 移动 tag，仅安装工具链，无仓库权限；保持 @stable 以持续获得 Rust 更新
