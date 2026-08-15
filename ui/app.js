@@ -16,6 +16,7 @@ const els = {
   btnRestart: $('btn-restart'),
   btnStop: $('btn-stop'),
   btnOpen: $('btn-open'),
+  enterHint: $('enter-hint'),
   btnUpdate: $('btn-update'),
   btnBrowser: $('btn-browser'),
   btnData: $('btn-data'),
@@ -73,6 +74,12 @@ async function refresh() {
   els.btnRestart.disabled = !running
   els.btnStop.disabled = !running && !starting
   els.btnOpen.disabled = !running
+  // 服务就绪后，「进入界面」成为主操作，并显示就绪提示（手动进入）
+  els.btnOpen.classList.toggle('primary', running)
+  els.enterHint.classList.toggle('hidden', !running)
+  if (running) {
+    els.enterHint.textContent = `服务已就绪（127.0.0.1:${st.port}）——点击「进入界面」手动进入 DeepSeek Harness`
+  }
   els.btnBrowser.disabled = !running
   state = { status: st.state, port: st.port, pid: st.pid, managed: st.managed }
   els.footStatus.textContent = `${new Date().toLocaleTimeString()} · 状态已刷新`
@@ -116,8 +123,15 @@ async function loadInfo() {
 els.btnStart.addEventListener('click', async () => { await call('start'); refresh() })
 els.btnRestart.addEventListener('click', async () => { await call('restart'); refresh() })
 els.btnStop.addEventListener('click', async () => { await call('stop'); refresh() })
-els.btnOpen.addEventListener('click', () => {
-  if (state.status === 'running' && state.port) window.location.href = `http://127.0.0.1:${state.port}`
+// 进入官方界面：由后端权威导航（enter_ui 命令）。应用打开后不会自动进入，
+// 必须用户手动点击「进入界面」
+els.btnOpen.addEventListener('click', async () => {
+  if (state.status !== 'running') return
+  try {
+    await invoke('enter_ui')
+  } catch (err) {
+    alert(`进入界面失败：${err}`)
+  }
 })
 els.btnBrowser.addEventListener('click', () => call('open_browser'))
 els.btnData.addEventListener('click', () => call('open_data_dir'))

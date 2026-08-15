@@ -271,11 +271,6 @@ impl DshServer {
         inner.message = message;
     }
 
-    /// 端口就绪探测（供导航 watcher 使用）：有 HTTP 应答即视为就绪。
-    pub fn is_ready(&self, port: u16) -> bool {
-        matches!(self.probe_port(port), ProbeResult::Dsh | ProbeResult::Foreign)
-    }
-
     /// 探测 127.0.0.1:port：Free=无服务 / Dsh=应答且带 dsh 特征 / Foreign=有应答但非 dsh。
     fn probe_port(&self, port: u16) -> ProbeResult {
         let addr = format!("127.0.0.1:{port}");

@@ -1,7 +1,7 @@
 {
   "name": "deepseek-harness-desktop-client",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "DeepSeek Harness Desktop Client — a modern desktop client for DeepSeek Harness (original Tauri shell)",
   "scripts": {
     "tauri": "tauri",

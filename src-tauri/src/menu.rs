@@ -6,6 +6,7 @@ use tauri::{AppHandle, Wry};
 
 pub const MENU_OPEN_BROWSER: &str = "open_browser";
 pub const MENU_OPEN_DATA_DIR: &str = "open_data_dir";
+pub const MENU_ENTER_UI: &str = "enter_ui";
 pub const MENU_RESTART: &str = "restart";
 pub const MENU_CONSOLE: &str = "console";
 pub const MENU_RELOAD: &str = "reload";
@@ -15,6 +16,7 @@ pub const MENU_QUIT: &str = "quit";
 pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let open_browser = MenuItem::with_id(app, MENU_OPEN_BROWSER, "在浏览器打开", true, Some("CmdOrCtrl+Shift+O"))?;
     let open_data = MenuItem::with_id(app, MENU_OPEN_DATA_DIR, "打开数据目录 (~/.dsh)", true, None::<&str>)?;
+    let enter_ui = MenuItem::with_id(app, MENU_ENTER_UI, "进入界面", true, Some("CmdOrCtrl+Shift+E"))?;
     let restart = MenuItem::with_id(app, MENU_RESTART, "重启服务", true, Some("CmdOrCtrl+Shift+R"))?;
     let console = MenuItem::with_id(app, MENU_CONSOLE, "控制台", true, Some("CmdOrCtrl+Shift+C"))?;
     let reload = MenuItem::with_id(app, MENU_RELOAD, "重新加载页面", true, Some("CmdOrCtrl+R"))?;
@@ -36,7 +38,7 @@ pub fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         &PredefinedMenuItem::paste(app, None)?,
         &PredefinedMenuItem::select_all(app, None)?,
     ])?;
-    let view = Submenu::with_items(app, "视图", true, &[&console, &reload])?;
+    let view = Submenu::with_items(app, "视图", true, &[&enter_ui, &console, &reload])?;
 
     Ok(Menu::with_items(app, &[&file, &edit, &view])?)
 }

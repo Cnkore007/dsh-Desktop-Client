@@ -169,6 +169,19 @@ fn open_browser(app: AppHandle) -> Result<(), String> {
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// 手动进入官方 dsh 界面（唯一的进入入口：应用打开后停留在控制台，
+/// 由用户点击「进入界面」后由后端权威导航，服务未运行时拒绝）。
+#[tauri::command]
+fn enter_ui(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let status = state.server.status();
+    if status.state != "running" {
+        return Err("服务未运行，请先启动服务".into());
+    }
+    let port = status.port.unwrap_or_else(DshServer::effective_port);
+    navigate_to(&app, &format!("http://127.0.0.1:{port}"));
+    Ok(())
+}
+
 #[tauri::command]
 fn open_data_dir(app: AppHandle) -> Result<(), String> {
     let dir = server::dsh_data_dir();
@@ -324,6 +337,11 @@ fn handle_menu_action(app: &AppHandle, id: &str) {
         menu::MENU_OPEN_DATA_DIR => {
             let _ = open_data_dir(app.clone());
         }
+        menu::MENU_ENTER_UI => {
+            if let Err(e) = enter_ui(app.clone(), state) {
+                eprintln!("enter_ui failed: {e}");
+            }
+        }
         menu::MENU_RESTART => restart_server(&state.server),
         menu::MENU_CONSOLE => {
             if let Some(url) = state.console_url.lock().unwrap().clone() {
@@ -344,13 +362,11 @@ fn handle_menu_action(app: &AppHandle, id: &str) {
     }
 }
 
-/// Watch the server state and move the webview between the console page and
-/// the dsh web UI accordingly. This is the single navigation authority.
-///
-/// Hardened per audit: the webview is only navigated to the remote page
-/// after the port is confirmed ready (no more ERR_CONNECTION_REFUSED dead
-/// pages), and it returns to the console whenever the service leaves the
-/// running state.
+/// Watch the server state and move the webview back to the console page
+/// whenever the service leaves the running state (no dead pages). Entering
+/// the dsh UI is always MANUAL: the console「进入界面」button (enter_ui)
+/// is the only entry point — the webview is never auto-navigated into the
+/// remote page.
 fn spawn_navigation_watcher(app: AppHandle, state: AppState) {
     thread::spawn(move || {
         let mut last = ServerState::Stopped;
@@ -363,21 +379,10 @@ fn spawn_navigation_watcher(app: AppHandle, state: AppState) {
                 _ => ServerState::Stopped,
             };
             if cur_state != last {
-                let port = current
-                    .port
-                    .unwrap_or_else(|| DshServer::effective_port());
-                if cur_state == ServerState::Running {
-                    // 就绪探测：服务真正可连后再导航（最多等待 20 秒）
-                    let ready = (0..40).any(|_| {
-                        thread::sleep(Duration::from_millis(500));
-                        state.server.is_ready(port)
-                    });
-                    if ready {
-                        navigate_to(&app, &format!("http://127.0.0.1:{port}"));
-                    } else if let Some(url) = state.console_url.lock().unwrap().clone() {
-                        navigate_to(&app, &url);
-                    }
-                } else if matches!(last, ServerState::Running | ServerState::Starting) {
+                // 服务离开运行态（停止/重启/崩溃）：回到控制台，避免连接拒绝死页
+                if matches!(last, ServerState::Running | ServerState::Starting)
+                    && cur_state != ServerState::Running
+                {
                     if let Some(url) = state.console_url.lock().unwrap().clone() {
                         navigate_to(&app, &url);
                     }
@@ -416,6 +421,7 @@ pub fn run() {
             info,
             set_port,
             open_browser,
+            enter_ui,
             open_data_dir,
             autostart_enabled,
             autostart_set,

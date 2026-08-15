@@ -12,6 +12,7 @@
     "allow-stop",
     "allow-info",
     "allow-open-browser",
+    "allow-enter-ui",
     "allow-open-data-dir",
     "allow-autostart-enabled",
     "allow-set-port",

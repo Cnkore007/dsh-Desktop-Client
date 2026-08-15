@@ -43,6 +43,11 @@ description = "允许调用 open_browser 命令"
 commands.allow = ["open_browser"]
 
 [[permission]]
+identifier = "allow-enter-ui"
+description = "允许调用 enter_ui 命令（手动进入官方 dsh 界面，导航由后端权威执行）"
+commands.allow = ["enter_ui"]
+
+[[permission]]
 identifier = "allow-open-data-dir"
 description = "允许调用 open_data_dir 命令"
 commands.allow = ["open_data_dir"]

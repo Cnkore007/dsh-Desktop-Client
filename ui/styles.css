@@ -110,6 +110,17 @@ body {
   white-space: pre-wrap;
 }
 
+.enter-hint {
+  margin-top: 14px;
+  background: rgba(77, 107, 254, 0.07);
+  border: 1px solid rgba(77, 107, 254, 0.25);
+  color: var(--ds-brand-deep);
+  border-radius: var(--ds-radius-panel);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
 /* actions */
 .actions-card { display: flex; flex-wrap: wrap; gap: 10px; }
 button {
