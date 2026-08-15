@@ -59,17 +59,25 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
+          DIST_DIR="$(pwd)/dist"
           if [ "${{ runner.os }}" = "macOS" ]; then
-            cd src-tauri/target/release/bundle/macos && zip -r ../../../../dist/DeepSeek-Harness-Desktop-Client_${{ matrix.target }}.zip *.app && cd -
-            cp src-tauri/target/release/bundle/dmg/*.dmg dist/ 2>/dev/null || true
+            find src-tauri/target/release/bundle -name "*.dmg" -exec cp {} "$DIST_DIR/" \; 2>/dev/null || true
+            if [ -d "src-tauri/target/release/bundle/macos" ]; then
+              (cd src-tauri/target/release/bundle/macos && zip -r "$DIST_DIR/DeepSeek-Harness-Desktop-Client_${{ matrix.target }}.zip" *.app) 2>/dev/null || true
+            fi
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            cp src-tauri/target/release/bundle/nsis/*.exe dist/ 2>/dev/null || true
+            find src-tauri/target/release/bundle -name "*.exe" -exec cp {} "$DIST_DIR/" \; 2>/dev/null || true
+            find src-tauri/target/release/bundle -name "*.msi" -exec cp {} "$DIST_DIR/" \; 2>/dev/null || true
           else
-            cp src-tauri/target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
-            cp src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
+            find src-tauri/target/release/bundle -name "*.deb" -exec cp {} "$DIST_DIR/" \; 2>/dev/null || true
+            find src-tauri/target/release/bundle -name "*.AppImage" -exec cp {} "$DIST_DIR/" \; 2>/dev/null || true
           fi
           test -n "$(ls -A dist)" || { echo "ERROR: no artifacts produced"; exit 1; }
-          (cd dist && shasum -a 256 * > SHA256SUMS.txt)
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd dist && sha256sum * > SHA256SUMS.txt)
+          elif command -v shasum >/dev/null 2>&1; then
+            (cd dist && shasum -a 256 * > SHA256SUMS.txt)
+          fi
           ls -la dist/
 
       - name: Upload artifacts
