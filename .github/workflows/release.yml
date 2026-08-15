@@ -48,9 +48,11 @@ jobs:
       - name: Prepare runtime (node + @deepseek-ai/dsh)
         run: npm run setup
 
-      # 审计 SC-08：--locked 确保按已提交的 Cargo.lock 构建
+      # 审计 SC-08：--locked 确保按已提交的 Cargo.lock 构建。tauri CLI 本身不
+      # 支持 --locked（早期写法 npx tauri build --locked 因此直接报错），
+      # 须放在 `--` 之后由 tauri 透传给 cargo。
       - name: Build
-        run: npx tauri build --locked ${{ matrix.bundle_args }}
+        run: npx tauri build ${{ matrix.bundle_args }} -- --locked
 
       - name: Collect artifacts
         shell: bash
