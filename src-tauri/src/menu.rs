@@ -1,4 +1,4 @@
-//! DSh Desktop — native menu and tray.
+//! DeepSeek Harness Desktop Client — native menu and tray.
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -54,7 +54,7 @@ pub fn build_tray(
     let on_action = std::sync::Arc::new(on_action);
     let click_action = on_action.clone();
     let mut builder = TrayIconBuilder::with_id("dsh-tray")
-        .tooltip("DSh Desktop")
+        .tooltip("DeepSeek Harness Desktop Client")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| on_action(app, event.id.as_ref()))

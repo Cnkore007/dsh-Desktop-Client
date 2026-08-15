@@ -1,0 +1,78 @@
+# DeepSeek Harness Desktop Client 应用命令权限（控制台页显式最小权限，
+# 替代审计 M6 指出的"依赖 ACL 未注册 app 权限的隐式放行"）。
+# capability default.json 显式引用以下 allow-* 权限。
+
+[[permission]]
+identifier = "allow-status"
+description = "允许调用 status 命令"
+commands.allow = ["status"]
+
+[[permission]]
+identifier = "allow-logs"
+description = "允许调用 logs 命令"
+commands.allow = ["logs"]
+
+[[permission]]
+identifier = "allow-clear-logs"
+description = "允许调用 clear_logs 命令"
+commands.allow = ["clear_logs"]
+
+[[permission]]
+identifier = "allow-start"
+description = "允许调用 start 命令"
+commands.allow = ["start"]
+
+[[permission]]
+identifier = "allow-restart"
+description = "允许调用 restart 命令"
+commands.allow = ["restart"]
+
+[[permission]]
+identifier = "allow-stop"
+description = "允许调用 stop 命令"
+commands.allow = ["stop"]
+
+[[permission]]
+identifier = "allow-info"
+description = "允许调用 info 命令"
+commands.allow = ["info"]
+
+[[permission]]
+identifier = "allow-open-browser"
+description = "允许调用 open_browser 命令"
+commands.allow = ["open_browser"]
+
+[[permission]]
+identifier = "allow-open-data-dir"
+description = "允许调用 open_data_dir 命令"
+commands.allow = ["open_data_dir"]
+
+[[permission]]
+identifier = "allow-autostart-enabled"
+description = "允许调用 autostart_enabled 命令"
+commands.allow = ["autostart_enabled"]
+
+[[permission]]
+identifier = "allow-set-port"
+description = "允许调用 set_port 命令"
+commands.allow = ["set_port"]
+
+[[permission]]
+identifier = "allow-autostart-set"
+description = "允许调用 autostart_set 命令"
+commands.allow = ["autostart_set"]
+
+[[permission]]
+identifier = "allow-update-dsh"
+description = "允许调用 update_dsh 命令"
+commands.allow = ["update_dsh"]
+
+[[permission]]
+identifier = "allow-set-locale"
+description = "允许调用 set_locale 命令"
+commands.allow = ["set_locale"]
+
+[[permission]]
+identifier = "allow-get-locale"
+description = "允许调用 get_locale 命令"
+commands.allow = ["get_locale"]

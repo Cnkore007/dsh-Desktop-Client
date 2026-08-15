@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DSh Desktop 控制台</title>
+  <title>DeepSeek Harness Desktop Client 控制台</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -22,12 +22,12 @@
           </defs>
         </svg>
         <div>
-          <h1>DSh Desktop</h1>
+          <h1>DeepSeek Harness Desktop Client</h1>
           <p class="subtitle">DeepSeek Harness 桌面客户端 · 控制台</p>
         </div>
       </div>
       <div class="topbar-right">
-        <span id="version" class="badge">v0.1.0</span>
+        <span id="version" class="badge">v1.0.0</span>
         <button id="check-update" class="ghost" title="检查 GitHub Releases 新版本">检查更新</button>
       </div>
     </header>
@@ -41,7 +41,9 @@
         <div class="status-details">
           <div class="kv"><span>端口</span><code id="kv-port">—</code></div>
           <div class="kv"><span>进程 PID</span><code id="kv-pid">—</code></div>
+          <div class="kv"><span>服务托管</span><code id="kv-managed">—</code></div>
           <div class="kv"><span>dsh 版本</span><code id="kv-dsh">—</code></div>
+          <div class="kv"><span>官方最新版</span><code id="kv-latest">—</code></div>
           <div class="kv"><span>数据目录</span><code id="kv-data">—</code></div>
         </div>
         <div id="error-box" class="error-box hidden"></div>
@@ -52,6 +54,7 @@
         <button id="btn-restart" disabled>重启服务</button>
         <button id="btn-stop" disabled>停止服务</button>
         <button id="btn-open" disabled>打开界面</button>
+        <button id="btn-update" disabled title="检测官方 dsh 新版本">更新官方 dsh</button>
         <button id="btn-browser">在浏览器打开</button>
         <button id="btn-data">打开数据目录</button>
       </section>
@@ -60,10 +63,71 @@
         <label class="switch-row">
           <span>
             <strong>开机自启</strong>
-            <small>登录系统后自动启动 DSh Desktop</small>
+            <small>登录系统后自动启动 DeepSeek Harness Desktop Client</small>
           </span>
           <input id="autostart" type="checkbox" />
         </label>
+        <label class="switch-row">
+          <span>
+            <strong>服务端口</strong>
+            <small>端口被占用时自动改用空闲端口；自定义端口保存后自动重启服务生效</small>
+          </span>
+          <span class="port-row">
+            <input id="port" class="port-input" type="number" min="1024" max="65535" inputmode="numeric" />
+            <button id="btn-save-port" class="ghost">保存</button>
+          </span>
+        </label>
+        <label class="switch-row">
+          <span>
+            <strong>界面语言（官方 dsh 界面）</strong>
+            <small>写入官方 locale 设置；"自动"跟随浏览器语言，重启服务后完全生效</small>
+          </span>
+          <select id="locale" class="select">
+            <option value="auto">自动</option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <details class="ref-details">
+          <summary>官方命令参考（中文）</summary>
+          <div class="ref-body">
+            <p>以下为官方 <code>dsh</code> 命令行帮助的中文对照（来自打包的官方运行时，桌面客户端不改动任何官方源码）。</p>
+            <h4>dsh —— 启动 DeepSeek Harness 档案（profile）</h4>
+            <pre>用法: dsh [选项] [命令] [参数...]
+
+选项:
+  -V, --version         输出版本号
+  --profile &lt;名称&gt;      要启动的档案（位于 $DSH_HOME/profiles 下）
+  --patch &lt;路径&gt;        追加的补丁覆盖层（可重复）
+  --dump-config         打印合成后的档案树并退出
+  --dump-default-config 打印不含用户层的档案树并退出
+
+命令:
+  web     启动 web 档案（即 --profile web 的别名）；web 自身的参数在其后
+  plugin  管理档案的插件（把剩余参数转发给档案目录中的 pnpm）</pre>
+            <h4>dsh web —— 启动 Web 服务（本桌面客户端使用）</h4>
+            <pre>用法: dsh --profile web [选项]
+
+选项:
+  --host &lt;主机&gt;       绑定主机地址（0.0.0.0 被官方有意禁用，防止网络暴露）
+  --port &lt;端口&gt;       监听端口；传 0 由系统分配空闲端口
+  --trusted-host &lt;主机:端口...&gt;  额外加入 /api 浏览器信任围栏的地址（可重复）
+  -h, --help          显示帮助
+
+示例:
+  dsh --profile web                在默认主机与端口上提供服务
+  dsh --profile web --port 8080    在其他端口提供服务</pre>
+            <h4>常见用法</h4>
+            <pre>dsh --profile headless "运行一个任务"   回答一个任务并退出（无界面）
+dsh --profile tui                       启动终端界面档案
+dsh --profile web --help                查看 web 档案的完整参数
+dsh plugin --profile tui add &lt;包名&gt;     向档案安装插件</pre>
+            <p class="ref-note">数据目录：<code>$DSH_HOME</code>（未设置时为 <code>~/.dsh</code>），与官方 CLI 完全兼容。</p>
+          </div>
+        </details>
       </section>
 
       <section class="card log-card">

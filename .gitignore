@@ -1,7 +1,10 @@
 node_modules/
 dist/
 target/
-src-tauri/resources/runtime/
+src-tauri/resources/runtime/*
+!src-tauri/resources/runtime/package.json
+!src-tauri/resources/runtime/package-lock.json
+!src-tauri/resources/runtime/update-runtime.mjs
 src-tauri/target/
 src-tauri/gen/
 .DS_Store

@@ -1,13 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "dsh-page",
-  "description": "Remote dsh web page (http://127.0.0.1:<port>): clipboard write/read only — the minimal IPC surface required for native clipboard copy in the web UI.",
+  "description": "Remote dsh web page (http://127.0.0.1:3080): clipboard write only — the minimal IPC surface required for native clipboard copy in the web UI. Read is intentionally NOT granted (audit: no readText usage in the official UI; XSS would otherwise silently exfiltrate the clipboard).",
   "windows": ["main"],
+  "local": false,
   "remote": {
-    "urls": ["http://127.0.0.1:*/*"]
+    "urls": ["http://127.0.0.1:3080/*"]
   },
   "permissions": [
-    "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-write-text"
   ]
 }

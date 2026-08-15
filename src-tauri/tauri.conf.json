@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DSh Desktop",
-  "version": "0.1.0",
-  "identifier": "dev.dshclient.desktop",
+  "productName": "DeepSeek Harness Desktop Client",
+  "version": "1.0.0",
+  "identifier": "com.deepseekharness.desktop",
   "build": {
     "frontendDist": "../ui"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DSh Desktop",
+        "title": "DeepSeek Harness Desktop Client",
         "width": 1200,
         "height": 800,
         "minWidth": 960,
@@ -20,13 +20,14 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://api.github.com https://registry.npmjs.org"
     }
   },
   "bundle": {
     "active": true,
     "targets": [
-      "app"
+      "app",
+      "dmg"
     ],
     "icon": [
       "icons/32x32.png",

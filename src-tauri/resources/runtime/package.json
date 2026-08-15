@@ -1,0 +1,15 @@
+{
+  "name": "dsh-desktop-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "allowScripts": {
+    "@deepseek-ai/dsh-subprocess-local": true,
+    "koffi": true,
+    "node-pty": true,
+    "@google/genai": true,
+    "protobufjs": true
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.0-rc.6"
+  }
+}

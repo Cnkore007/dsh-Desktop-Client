@@ -1,8 +1,8 @@
 {
-  "name": "dsh-desktop-client",
+  "name": "deepseek-harness-desktop-client",
   "private": true,
-  "version": "0.1.0",
-  "description": "DSh Desktop — a modern desktop client for DeepSeek Harness (original Tauri shell)",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness Desktop Client — a modern desktop client for DeepSeek Harness (original Tauri shell)",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
@@ -10,8 +10,7 @@
     "icon": "tauri icon",
     "fetch:node": "node scripts/fetch-node.mjs",
     "setup:runtime": "node scripts/prepare-runtime.mjs",
-    "patch:web": "node scripts/patch-web-bundle.mjs",
-    "setup": "npm run fetch:node && npm run setup:runtime && npm run patch:web",
+    "setup": "npm run fetch:node && npm run setup:runtime",
     "bundle": "npm run setup && tauri build"
   },
   "devDependencies": {
