@@ -53,6 +53,9 @@ jobs:
         run: npm run setup
 
       - name: Build
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_STRIP: "true"
         run: npx tauri build ${{ matrix.bundle_args }} -- --locked
 
       - name: Collect artifacts
