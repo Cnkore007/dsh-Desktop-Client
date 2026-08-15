@@ -39,8 +39,6 @@ const STABLE_WINDOW: Duration = Duration::from_secs(30);
 const ATTACH_FAIL_LIMIT: u32 = 3;
 /// attach 身份特征：官方 dsh 首页 HTML 的 title（防止把任意 HTTP 200 服务当 dsh 接管）
 const DSH_BODY_MARKER: &str = "DeepSeek Harness";
-/// 端口冲突时自动扫描的空闲端口数量上限（从配置端口起 +32）
-const MAX_PORT_SCAN: u16 = 32;
 /// 合法端口下限（<1024 需要特权，避免误用）
 const MIN_PORT: u16 = 1024;
 
@@ -78,6 +76,20 @@ pub struct ServerStatus {
     pub message: Option<String>,
     /// true = 由本应用 spawn 并完全托管；false = attach 到的外部/残留实例
     pub managed: bool,
+    /// 占用该端口的进程 PID（若检测到端口冲突或外部进程）
+    pub occupant_pid: Option<u32>,
+    /// 当前工作区目录路径
+    pub workspace: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SessionStats {
+    pub count: usize,
+    pub size_bytes: u64,
+    pub size_formatted: String,
+    pub backup_count: usize,
+    pub sessions_dir: String,
+    pub backups_dir: String,
 }
 
 /// 端口探测结果：空闲 / 应答为 dsh 服务 / 应答为非 dsh 服务
@@ -151,6 +163,55 @@ pub fn desktop_settings_path() -> PathBuf {
     dsh_data_dir().join("desktop-settings.json")
 }
 
+/// 读取桌面配置中的工作区路径（若未设置或不存在则返回 None）。
+pub fn read_workspace() -> Option<PathBuf> {
+    let text = std::fs::read_to_string(desktop_settings_path()).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    v.get("workspace")
+        .and_then(|w| w.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
+}
+
+/// 默认工作区路径（优先使用用户主目录或当前目录）
+pub fn default_workspace_dir() -> PathBuf {
+    std::env::home_dir().unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// 有效工作区路径
+pub fn effective_workspace() -> PathBuf {
+    read_workspace().unwrap_or_else(default_workspace_dir)
+}
+
+/// 持久化工作区路径到桌面配置（原子写，传入 None 则清除自定义设置）
+pub fn write_workspace(workspace: Option<&str>) -> Result<(), String> {
+    let path = desktop_settings_path();
+    let dir = path.parent().ok_or("desktop-settings 路径无父目录")?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let mut doc: serde_json::Value =
+        std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_else(|| serde_json::json!({}));
+    if let Some(obj) = doc.as_object_mut() {
+        if let Some(ws) = workspace {
+            let trimmed = ws.trim();
+            if trimmed.is_empty() {
+                obj.remove("workspace");
+            } else {
+                obj.insert("workspace".into(), serde_json::json!(trimmed));
+            }
+        } else {
+            obj.remove("workspace");
+        }
+    }
+    let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// 读取桌面配置中的端口（未设置返回 None）。
 fn read_settings_port() -> Option<u16> {
     let text = std::fs::read_to_string(desktop_settings_path()).ok()?;
@@ -179,12 +240,259 @@ pub fn write_settings_port(port: u16) -> Result<(), String> {
     Ok(())
 }
 
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+/// 获取会话统计信息
+pub fn get_session_stats() -> SessionStats {
+    let dsh_dir = dsh_data_dir();
+    let sessions_dir = dsh_dir.join("sessions");
+    let backups_dir = dsh_dir.join("backups");
+
+    let mut count = 0usize;
+    let mut size_bytes = 0u64;
+
+    if sessions_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&sessions_dir) {
+            for entry in entries.flatten() {
+                count += 1;
+                if let Ok(meta) = entry.metadata() {
+                    if meta.is_file() {
+                        size_bytes += meta.len();
+                    } else if meta.is_dir() {
+                        if let Ok(sub) = std::fs::read_dir(entry.path()) {
+                            for sub_entry in sub.flatten() {
+                                if let Ok(m) = sub_entry.metadata() {
+                                    size_bytes += m.len();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut backup_count = 0usize;
+    if backups_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&backups_dir) {
+            backup_count = entries.flatten().filter(|e| e.path().is_file()).count();
+        }
+    }
+
+    SessionStats {
+        count,
+        size_bytes,
+        size_formatted: format_size(size_bytes),
+        backup_count,
+        sessions_dir: sessions_dir.display().to_string(),
+        backups_dir: backups_dir.display().to_string(),
+    }
+}
+
+/// 一键将会话打包备份至 ~/.dsh/backups/
+pub fn backup_sessions() -> Result<PathBuf, String> {
+    let dsh_dir = dsh_data_dir();
+    let sessions_dir = dsh_dir.join("sessions");
+    let backups_dir = dsh_dir.join("backups");
+    std::fs::create_dir_all(&backups_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
+
+    let timestamp = {
+        let now = std::time::SystemTime::now();
+        let dur = now.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+        dur.as_secs()
+    };
+    let file_name = format!("dsh-sessions-backup-{timestamp}.tar.gz");
+    let dest_file = backups_dir.join(&file_name);
+
+    if !sessions_dir.exists() {
+        std::fs::create_dir_all(&sessions_dir).map_err(|e| format!("创建会话目录失败: {e}"))?;
+    }
+
+    #[cfg(unix)]
+    {
+        let output = Command::new("tar")
+            .args(["-czf", dest_file.to_str().unwrap(), "-C", dsh_dir.to_str().unwrap(), "sessions"])
+            .output()
+            .map_err(|e| format!("执行 tar 备份失败: {e}"))?;
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("备份会话失败: {err}"));
+        }
+    }
+    #[cfg(windows)]
+    {
+        let script = format!(
+            "Compress-Archive -Path '{}' -DestinationPath '{}' -Force",
+            sessions_dir.display(),
+            dest_file.with_extension("zip").display()
+        );
+        let output = Command::new("powershell")
+            .args(["-Command", &script])
+            .output()
+            .map_err(|e| format!("执行 PowerShell 压缩失败: {e}"))?;
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("备份会话失败: {err}"));
+        }
+    }
+
+    Ok(dest_file)
+}
+
+/// 清理会话与临时存储（清理前自动备份）
+pub fn clear_session_cache() -> Result<String, String> {
+    let backup_path = backup_sessions()?;
+    let dsh_dir = dsh_data_dir();
+    let sessions_dir = dsh_dir.join("sessions");
+    let storages_dir = dsh_dir.join("storages");
+
+    if sessions_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&sessions_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let _ = std::fs::remove_dir_all(&p);
+                } else {
+                    let _ = std::fs::remove_file(&p);
+                }
+            }
+        }
+    }
+
+    if storages_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&storages_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let _ = std::fs::remove_dir_all(&p);
+                } else {
+                    let _ = std::fs::remove_file(&p);
+                }
+            }
+        }
+    }
+
+    Ok(format!("已清理会话缓存（已自动备份至 {}）", backup_path.display()))
+}
+
 fn now() -> String {
     let d = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
     let secs = d.as_secs() % 86_400;
     format!("{:02}:{:02}:{:02}", secs / 3600, (secs % 3600) / 60, secs % 60)
+}
+
+/// 查找监听在指定端口的进程 PID（跨平台）
+pub fn find_port_pid(port: u16) -> Option<u32> {
+    #[cfg(unix)]
+    {
+        if let Ok(output) = Command::new("lsof")
+            .args(["-t", &format!("-iTCP:{port}"), "-sTCP:LISTEN"])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    if let Ok(pid) = line.trim().parse::<u32>() {
+                        if pid > 1 && pid != std::process::id() {
+                            return Some(pid);
+                        }
+                    }
+                }
+            }
+        }
+        if let Ok(output) = Command::new("lsof")
+            .args(["-t", &format!("-i:{port}")])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    if let Ok(pid) = line.trim().parse::<u32>() {
+                        if pid > 1 && pid != std::process::id() {
+                            return Some(pid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        if let Ok(output) = Command::new("cmd")
+            .args(["/c", &format!("netstat -ano | findstr :{port}")])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 5 && parts.contains(&"LISTENING") {
+                        if let Some(last) = parts.last() {
+                            if let Ok(pid) = last.parse::<u32>() {
+                                if pid > 0 && pid != std::process::id() {
+                                    return Some(pid);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// 终止占用指定端口的进程（优雅 SIGTERM → 超时 SIGKILL）
+pub fn kill_port_occupant(port: u16) -> Result<(), String> {
+    let pid = find_port_pid(port).ok_or_else(|| format!("未找到占用端口 {port} 的进程"))?;
+    if pid <= 1 || pid == std::process::id() {
+        return Err("无法终止系统关键进程或当前应用自身".into());
+    }
+
+    #[cfg(unix)]
+    {
+        let _ = Command::new("kill").arg("-15").arg(pid.to_string()).output();
+        thread::sleep(Duration::from_millis(400));
+        if find_port_pid(port) == Some(pid) {
+            let _ = Command::new("kill").arg("-9").arg(pid.to_string()).output();
+            thread::sleep(Duration::from_millis(300));
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .output();
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    for _ in 0..10 {
+        let addr = format!("127.0.0.1:{port}");
+        if TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(150)).is_err() {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(150));
+    }
+
+    Ok(())
 }
 
 impl DshServer {
@@ -213,13 +521,6 @@ impl DshServer {
             .unwrap_or(DEFAULT_PORT)
     }
 
-    /// 从 start 起扫描最多 MAX_PORT_SCAN 个端口，返回第一个空闲端口。
-    fn find_free_port(&self, start: u16) -> Option<u16> {
-        (start..start.saturating_add(MAX_PORT_SCAN)).find(|&p| {
-            p >= MIN_PORT && matches!(self.probe_port(p), ProbeResult::Free)
-        })
-    }
-
     /// Record where the bundled runtime lives (app resource dir).
     pub fn set_resource_dir(&self, dir: PathBuf) {
         self.inner.lock().unwrap().resource_dir = Some(dir);
@@ -234,12 +535,20 @@ impl DshServer {
 
     pub fn status(&self) -> ServerStatus {
         let inner = self.inner.lock().unwrap();
+        let current_port = if inner.port != 0 { inner.port } else { Self::effective_port() };
+        let occupant_pid = if inner.state == ServerState::Error {
+            find_port_pid(current_port)
+        } else {
+            None
+        };
         ServerStatus {
             state: inner.state.as_str().to_string(),
             port: (inner.port != 0).then_some(inner.port),
             pid: inner.pid,
             message: inner.message.clone(),
-            managed: inner.pid.is_some(),
+            managed: inner.pid.is_some() && inner.child.is_some(),
+            occupant_pid,
+            workspace: effective_workspace().display().to_string(),
         }
     }
 
@@ -272,22 +581,58 @@ impl DshServer {
     }
 
     /// 探测 127.0.0.1:port：Free=无服务 / Dsh=应答且带 dsh 特征 / Foreign=有应答但非 dsh。
-    fn probe_port(&self, port: u16) -> ProbeResult {
+    /// 发送完整 HTTP/1.1 请求并循环读取响应体，避免单次 read 只读取头部导致特征误判。
+    pub fn probe_port(&self, port: u16) -> ProbeResult {
         let addr = format!("127.0.0.1:{port}");
         let Ok(mut stream) =
-            TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(600))
+            TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(800))
         else {
             return ProbeResult::Free;
         };
-        let _ = stream.set_read_timeout(Some(Duration::from_millis(600)));
-        let _ = stream.write_all(b"GET / HTTP/1.0\r\n\r\n");
-        let mut buf = [0u8; 4096];
-        let Ok(n) = stream.read(&mut buf) else { return ProbeResult::Foreign };
-        let head = String::from_utf8_lossy(&buf[..n]);
-        if !(head.starts_with("HTTP/1.1 200") || head.starts_with("HTTP/1.0 200")) {
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(800)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(800)));
+        let req = format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: DeepSeek-Harness-Desktop\r\nConnection: close\r\nAccept: text/html,*/*\r\n\r\n");
+        if stream.write_all(req.as_bytes()).is_err() {
             return ProbeResult::Foreign;
         }
-        if head.contains(DSH_BODY_MARKER) {
+
+        let mut resp = Vec::with_capacity(8192);
+        let mut buf = [0u8; 1024];
+        while resp.len() < 16384 {
+            match stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    resp.extend_from_slice(&buf[..n]);
+                    let body = String::from_utf8_lossy(&resp);
+                    if body.contains(DSH_BODY_MARKER)
+                        || body.contains("<title>DeepSeek Harness</title>")
+                        || body.contains("deepseek-harness")
+                        || body.contains("dsh-web")
+                        || body.contains("manifest.webmanifest")
+                    {
+                        return ProbeResult::Dsh;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+
+        if resp.is_empty() {
+            return ProbeResult::Foreign;
+        }
+        let text = String::from_utf8_lossy(&resp);
+        let is_http_ok = text.starts_with("HTTP/1.1 200")
+            || text.starts_with("HTTP/1.0 200")
+            || text.starts_with("HTTP/1.1 304")
+            || text.starts_with("HTTP/1.0 304");
+
+        if is_http_ok && (
+            text.contains(DSH_BODY_MARKER)
+            || text.contains("<title>DeepSeek Harness</title>")
+            || text.contains("manifest.webmanifest")
+            || text.contains("/assets/index-")
+            || text.contains("/assets/vendor-")
+        ) {
             ProbeResult::Dsh
         } else {
             ProbeResult::Foreign
@@ -351,7 +696,6 @@ impl DshServer {
     // ── 生命周期 ────────────────────────────────────────────────────────
 
     /// Start (or attach to) the dsh web server. Never blocks for long.
-    /// 端口被非 dsh 服务占用时自动扫描空闲端口并持久化（用户无需手动干预）。
     pub fn start(&self) -> Result<(), String> {
         let port = Self::effective_port();
         {
@@ -367,32 +711,6 @@ impl DshServer {
             inner.attach_failures = 0;
         }
         self.log("info", format!("准备启动 dsh 服务（端口 {port}）"));
-
-        // 端口被非 dsh 服务占用：自动改用第一个空闲端口
-        if matches!(self.probe_port(port), ProbeResult::Foreign) {
-            match self.find_free_port(port.saturating_add(1)) {
-                Some(free) => {
-                    self.log("warn", format!(
-                        "端口 {port} 已被其他程序占用（非 dsh 服务），已自动改用空闲端口 {free}"
-                    ));
-                    let _ = write_settings_port(free);
-                    let mut inner = self.inner.lock().unwrap();
-                    inner.port = free;
-                    drop(inner);
-                    self.notify_port(free);
-                    return self.start_impl(free);
-                }
-                None => {
-                    self.set_state(
-                        ServerState::Error,
-                        Some(format!(
-                            "端口 {port} 被占用且附近 {MAX_PORT_SCAN} 个端口均不可用，请在控制台「设置」中指定其他端口"
-                        )),
-                    );
-                    return Err("no free port found".into());
-                }
-            }
-        }
         self.start_impl(port)
     }
 
@@ -400,48 +718,91 @@ impl DshServer {
         match self.probe_port(port) {
             ProbeResult::Free => self.spawn(port),
             ProbeResult::Dsh => {
+                let occ_pid = find_port_pid(port);
                 {
                     let mut inner = self.inner.lock().unwrap();
                     inner.state = ServerState::Running;
-                    inner.pid = None;
+                    inner.port = port;
+                    inner.pid = occ_pid;
                     inner.running_since = Some(Instant::now());
                     inner.attach_failures = 0;
+                    inner.message = None;
                 }
-                self.log("ok", format!("检测到已在运行的 dsh 服务（127.0.0.1:{port}），已接管健康监控"));
+                let pid_str = occ_pid.map(|p| format!("（PID: {p}）")).unwrap_or_default();
+                self.log("ok", format!("检测到已在运行的 dsh 服务（127.0.0.1:{port}{pid_str}），已接管健康监控"));
                 self.notify_port(port);
                 self.watchdog();
                 Ok(())
             }
             ProbeResult::Foreign => {
+                let occ_pid = find_port_pid(port);
+                let pid_str = occ_pid.map(|p| format!(" (PID: {p})")).unwrap_or_default();
                 self.set_state(
                     ServerState::Error,
                     Some(format!(
-                        "端口 {port} 已被其他程序占用（非 dsh 服务）。可在控制台「设置」中指定其他端口"
+                        "端口 {port} 已被占用{pid_str}。若为残留的 dsh 服务，可点击「接管现有服务」；或点击「终止占用进程并重新拉起」。"
                     )),
                 );
-                Err("port occupied by a non-dsh service".into())
+                self.log("warn", format!("端口 {port} 已被占用{pid_str}，等待用户处理"));
+                Err(format!("port {port} occupied"))
             }
         }
+    }
+
+    /// 手动接管已有端口的服务
+    pub fn attach_port(&self, port: u16) -> Result<(), String> {
+        let occ_pid = find_port_pid(port);
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.state = ServerState::Running;
+            inner.port = port;
+            inner.pid = occ_pid;
+            inner.running_since = Some(Instant::now());
+            inner.attach_failures = 0;
+            inner.message = None;
+        }
+        let pid_str = occ_pid.map(|p| format!("（PID: {p}）")).unwrap_or_default();
+        self.log("ok", format!("已手动接管 127.0.0.1:{port} 上的服务{pid_str}"));
+        self.notify_port(port);
+        self.watchdog();
+        Ok(())
+    }
+
+    /// 终止占用指定端口的进程并重新拉起 dsh 服务
+    pub fn kill_and_restart(&self, port: u16) -> Result<(), String> {
+        self.log("info", format!("正在终止占用端口 {port} 的进程…"));
+        if let Err(e) = kill_port_occupant(port) {
+            self.log("warn", format!("终止端口 {port} 占用进程提示: {e}"));
+        } else {
+            self.log("ok", format!("端口 {port} 占用进程已成功终止，端口已释放"));
+        }
+        self.stop();
+        thread::sleep(Duration::from_millis(500));
+        self.start()
     }
 
     fn spawn(&self, port: u16) -> Result<(), String> {
         let Some(node) = self.resolve_node() else {
             self.set_state(
                 ServerState::Error,
-                Some("未找到 Node 运行时（runtime/node 缺失，请运行 npm run prepare）".into()),
+                Some("未找到 Node 运行时（runtime/node 缺失，请运行 npm run setup）".into()),
             );
             return Err("node runtime not found".into());
         };
         let Some(bin) = self.resolve_dsh_bin() else {
             self.set_state(
                 ServerState::Error,
-                Some("dsh 运行时缺失（请运行 npm run prepare）".into()),
+                Some("dsh 运行时缺失（请运行 npm run setup）".into()),
             );
             return Err("dsh runtime not found".into());
         };
 
         let mut cmd = Command::new(&node);
         cmd.arg(&bin).arg("web").arg("--port").arg(port.to_string());
+        let ws = effective_workspace();
+        if ws.is_dir() {
+            cmd.current_dir(&ws);
+        }
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         cmd.stdin(Stdio::null());
         #[cfg(unix)]
@@ -506,16 +867,38 @@ impl DshServer {
             {
                 let mut inner = server.inner.lock().unwrap();
                 if inner.stop_requested {
+                    let port = if inner.port != 0 { inner.port } else { Self::effective_port() };
+                    let pid = inner.pid;
                     if let Some(mut child) = inner.child.take() {
                         let _ = child.kill();
                         let _ = child.wait();
+                    }
+                    if let Some(p) = pid {
+                        if p > 1 && p != std::process::id() {
+                            #[cfg(unix)]
+                            {
+                                let _ = Command::new("kill").args(["-15", &format!("-{p}")]).output();
+                                let _ = Command::new("kill").args(["-9", &format!("-{p}")]).output();
+                                let _ = Command::new("kill").args(["-15", &p.to_string()]).output();
+                                let _ = Command::new("kill").args(["-9", &p.to_string()]).output();
+                            }
+                            #[cfg(windows)]
+                            {
+                                let _ = Command::new("taskkill")
+                                    .args(["/F", "/T", "/PID", &p.to_string()])
+                                    .output();
+                            }
+                        }
                     }
                     inner.pid = None;
                     inner.state = ServerState::Stopped;
                     inner.message = None;
                     inner.running_since = None;
                     drop(inner);
-                    server.log("info", "服务已停止".into());
+                    if port > 0 {
+                        let _ = kill_port_occupant(port);
+                    }
+                    server.log("info", "服务已停止，进程已退出，端口已释放".into());
                     return;
                 }
             }
@@ -539,29 +922,13 @@ impl DshServer {
                     None => None,
                 }
             };
-            if let Some((code, port)) = exited {
-                // 端口已被占用（EADDRINUSE / 他人抢占）→ 非服务自身崩溃，不计入崩溃次数；
-                // 若占用者不是 dsh，自动切换到空闲端口重启
-                let port_occupied = server.probe_port(port) != ProbeResult::Free;
-                let mut switched_port: Option<u16> = None;
-                if port_occupied {
-                    switched_port = server.find_free_port(port.saturating_add(1));
-                }
+            if let Some((code, _port)) = exited {
                 let restart = {
                     let mut inner = server.inner.lock().unwrap();
                     inner.child = None;
                     inner.pid = None;
                     inner.running_since = None;
-                    if let Some(free) = switched_port {
-                        inner.port = free;
-                        inner.state = ServerState::Stopped; // 放行 start() 守卫
-                        true
-                    } else if port_occupied {
-                        inner.state = ServerState::Error;
-                        inner.message =
-                            Some(format!("端口 {port} 被其他程序占用，dsh 服务无法启动"));
-                        false
-                    } else if inner.crash_count + 1 >= MAX_CONSECUTIVE_CRASHES {
+                    if inner.crash_count + 1 >= MAX_CONSECUTIVE_CRASHES {
                         inner.state = ServerState::Error;
                         inner.message = Some(format!(
                             "服务连续崩溃 {MAX_CONSECUTIVE_CRASHES} 次，已停止自动重启（可在控制台手动启动）"
@@ -574,15 +941,7 @@ impl DshServer {
                     }
                 };
                 if restart {
-                    if let Some(free) = switched_port {
-                        let _ = write_settings_port(free);
-                        server.log("warn", format!(
-                            "端口 {port} 被其他程序占用，已自动改用空闲端口 {free} 并重启"
-                        ));
-                        server.notify_port(free);
-                    } else {
-                        server.log("warn", format!("dsh 服务异常退出（code {code}），自动重启…"));
-                    }
+                    server.log("warn", format!("dsh 服务异常退出（code {code}），准备自动重启…"));
                     thread::sleep(CRASH_BACKOFF);
                     // backoff 期间用户可能请求了停止：尊重停止请求
                     if server.inner.lock().unwrap().stop_requested {
@@ -593,7 +952,7 @@ impl DshServer {
                 } else {
                     server.log(
                         "error",
-                        "dsh 服务停止（端口占用或崩溃次数超限，可在控制台手动处理）".into(),
+                        "dsh 服务停止（崩溃次数超限，可在控制台手动处理）".into(),
                     );
                 }
                 continue;
@@ -632,19 +991,42 @@ impl DshServer {
     /// Request a stop: kills the child process and marks the state.
     /// Idempotent; safe to call while the watchdog is running or backing off.
     pub fn stop(&self) {
-        {
+        let port = {
             let mut inner = self.inner.lock().unwrap();
             inner.stop_requested = true;
+            let port = if inner.port != 0 { inner.port } else { Self::effective_port() };
+            let pid = inner.pid;
             if let Some(mut child) = inner.child.take() {
                 let _ = child.kill();
                 let _ = child.wait();
+            }
+            if let Some(p) = pid {
+                if p > 1 && p != std::process::id() {
+                    #[cfg(unix)]
+                    {
+                        let _ = Command::new("kill").args(["-15", &format!("-{p}")]).output();
+                        let _ = Command::new("kill").args(["-9", &format!("-{p}")]).output();
+                        let _ = Command::new("kill").args(["-15", &p.to_string()]).output();
+                        let _ = Command::new("kill").args(["-9", &p.to_string()]).output();
+                    }
+                    #[cfg(windows)]
+                    {
+                        let _ = Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &p.to_string()])
+                            .output();
+                    }
+                }
             }
             inner.pid = None;
             inner.state = ServerState::Stopped;
             inner.message = None;
             inner.running_since = None;
+            port
+        };
+        if port > 0 {
+            let _ = kill_port_occupant(port);
         }
-        self.log("info", "服务已停止".into());
+        self.log("info", "服务已停止，进程已退出，端口已释放".into());
     }
 
     /// 在线更新官方 @deepseek-ai/dsh 到指定版本（用户级 runtime；绝不修改
@@ -723,5 +1105,116 @@ impl DshServer {
             }
         }
         None
+    }
+
+    /// 查询官方 @deepseek-ai/dsh 最新版本（npm registry 优先，GitHub releases 兜底）
+    pub fn fetch_latest_dsh_version() -> Option<String> {
+        if let Ok(output) = Command::new("curl")
+            .args(["-s", "--max-time", "4", "-H", "Accept: application/json", "https://registry.npmjs.org/@deepseek-ai/dsh"])
+            .output()
+        {
+            if output.status.success() {
+                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+                    if let Some(ver) = json.get("dist-tags")
+                        .and_then(|dt| dt.get("latest").or_else(|| dt.get("next")))
+                        .and_then(|v| v.as_str())
+                    {
+                        return Some(ver.to_string());
+                    }
+                }
+            }
+        }
+
+        if let Ok(output) = Command::new("curl")
+            .args(["-s", "--max-time", "4", "-H", "Accept: application/vnd.github+json", "https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest"])
+            .output()
+        {
+            if output.status.success() {
+                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+                    if let Some(tag) = json.get("tag_name").and_then(|t| t.as_str()) {
+                        return Some(tag.trim_start_matches('v').to_string());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    #[test]
+    fn test_effective_port_default() {
+        assert_eq!(DEFAULT_PORT, 3080);
+    }
+
+    #[test]
+    fn test_probe_free_port() {
+        let server = DshServer::new();
+        // 查找一个当前没有监听的临时端口
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener); // 释放端口
+
+        assert_eq!(server.probe_port(port), ProbeResult::Free);
+    }
+
+    #[test]
+    fn test_probe_dsh_mock() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 512];
+                let _ = stream.read(&mut buf);
+                let html = "<!doctype html><html><head><title>DeepSeek Harness</title></head><body></body></html>";
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    html.len(),
+                    html
+                );
+                let _ = stream.write_all(resp.as_bytes());
+            }
+        });
+
+        let server = DshServer::new();
+        assert_eq!(server.probe_port(port), ProbeResult::Dsh);
+    }
+
+    #[test]
+    fn test_probe_foreign_mock() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 512];
+                let _ = stream.read(&mut buf);
+                let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\nConnection: close\r\n\r\nHello World!";
+                let _ = stream.write_all(resp.as_bytes());
+            }
+        });
+
+        let server = DshServer::new();
+        assert_eq!(server.probe_port(port), ProbeResult::Foreign);
+    }
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(500), "500 B");
+        assert_eq!(format_size(1024), "1.0 KB");
+        assert_eq!(format_size(1024 * 1024 * 3), "3.0 MB");
+    }
+
+    #[test]
+    fn test_get_session_stats() {
+        let stats = get_session_stats();
+        assert!(!stats.sessions_dir.is_empty());
+        assert!(!stats.backups_dir.is_empty());
     }
 }

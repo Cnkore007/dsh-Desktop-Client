@@ -48,10 +48,13 @@ pub fn build_tray(
     on_action: impl Fn(&AppHandle, &str) + Send + Sync + 'static,
 ) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, MENU_SHOW_WINDOW, "显示窗口", true, None::<&str>)?;
+    let enter_ui = MenuItem::with_id(app, MENU_ENTER_UI, "进入主界面", true, None::<&str>)?;
+    let console = MenuItem::with_id(app, MENU_CONSOLE, "控制台", true, None::<&str>)?;
     let open_browser = MenuItem::with_id(app, MENU_OPEN_BROWSER, "在浏览器打开", true, None::<&str>)?;
     let restart = MenuItem::with_id(app, MENU_RESTART, "重启服务", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &open_browser, &restart, &quit])?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(app, &[&show, &enter_ui, &console, &open_browser, &restart, &sep, &quit])?;
 
     let on_action = std::sync::Arc::new(on_action);
     let click_action = on_action.clone();

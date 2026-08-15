@@ -12,6 +12,9 @@ const els = {
   kvDsh: $('kv-dsh'),
   kvData: $('kv-data'),
   errorBox: $('error-box'),
+  conflictActions: $('conflict-actions'),
+  btnKillRestart: $('btn-kill-restart'),
+  btnAttach: $('btn-attach'),
   btnStart: $('btn-start'),
   btnRestart: $('btn-restart'),
   btnStop: $('btn-stop'),
@@ -29,6 +32,13 @@ const els = {
   logView: $('log-view'),
   version: $('version'),
   kvLatest: $('kv-latest'),
+  kvWorkspace: $('kv-workspace'),
+  btnPickWorkspace: $('btn-pick-workspace'),
+  btnOpenWorkspace: $('btn-open-workspace'),
+  btnResetWorkspace: $('btn-reset-workspace'),
+  sessionStatBadge: $('session-stat-badge'),
+  btnBackupSessions: $('btn-backup-sessions'),
+  btnCleanSessions: $('btn-clean-sessions'),
   footStatus: $('foot-status'),
 }
 
@@ -62,12 +72,19 @@ async function refresh() {
   els.statusLabel.textContent = meta.label
   const running = st.state === 'running'
   // 非运行状态忽略 port 字段（停止后端口不再展示/可用）
-  els.kvPort.textContent = running && st.port ? st.port : '—'
-  els.kvPid.textContent = st.pid ?? '—'
+  els.kvPort.textContent = running && st.port ? st.port : (st.port ?? '—')
+  els.kvPid.textContent = st.pid ?? (st.occupant_pid ? `${st.occupant_pid} (占用)` : '—')
   // managed=false：attach 到的外部/残留 dsh 实例
   els.kvManaged.textContent = running ? (st.managed ? '本应用托管' : '外部进程') : '—'
+  if (st.workspace) {
+    els.kvWorkspace.textContent = st.workspace
+    els.kvWorkspace.title = `当前工作区: ${st.workspace}`
+  }
   els.errorBox.classList.toggle('hidden', !(st.message))
   if (st.message) els.errorBox.textContent = st.message
+
+  const isConflict = st.state === 'error' && (st.message && (st.message.includes('占用') || st.message.includes('occupied')))
+  els.conflictActions.classList.toggle('hidden', !isConflict)
 
   const starting = st.state === 'starting'
   els.btnStart.disabled = running || starting
@@ -123,6 +140,28 @@ async function loadInfo() {
 els.btnStart.addEventListener('click', async () => { await call('start'); refresh() })
 els.btnRestart.addEventListener('click', async () => { await call('restart'); refresh() })
 els.btnStop.addEventListener('click', async () => { await call('stop'); refresh() })
+
+els.btnKillRestart.addEventListener('click', async () => {
+  els.btnKillRestart.disabled = true
+  els.btnKillRestart.textContent = '终止中…'
+  await call('kill_port_process', { port: parseInt(els.port.value, 10) || null })
+  setTimeout(() => {
+    els.btnKillRestart.disabled = false
+    els.btnKillRestart.textContent = '终止占用进程并重新拉起'
+    refresh()
+  }, 1000)
+})
+
+els.btnAttach.addEventListener('click', async () => {
+  els.btnAttach.disabled = true
+  els.btnAttach.textContent = '接管中…'
+  await call('attach_port', { port: parseInt(els.port.value, 10) || null })
+  setTimeout(() => {
+    els.btnAttach.disabled = false
+    els.btnAttach.textContent = '接管现有服务'
+    refresh()
+  }, 600)
+})
 // 进入官方界面：由后端权威导航（enter_ui 命令）。应用打开后不会自动进入，
 // 必须用户手动点击「进入界面」
 els.btnOpen.addEventListener('click', async () => {
@@ -215,16 +254,40 @@ els.btnCheckUpdate.addEventListener('click', async () => {
 
 // ---- 官方 dsh 版本检测与在线更新 ------------------------------------------
 async function checkDshLatest() {
-  try {
-    const res = await fetch('https://registry.npmjs.org/@deepseek-ai/dsh/latest', {
-      headers: { Accept: 'application/vnd.npm.install-v1+json' },
-    })
-    if (!res.ok) throw new Error(String(res.status))
-    const meta = await res.json()
-    return meta.version ?? null
-  } catch {
-    return null
+  // 1. 优先调用后端命令（系统级网络请求，带多源解析）
+  const info = await call('check_official_dsh')
+  if (info && info.latest_version) {
+    return info.latest_version
   }
+
+  // 2. 前端 fetch npm registry（标准 json 头）
+  try {
+    const res = await fetch('https://registry.npmjs.org/@deepseek-ai/dsh', {
+      headers: { Accept: 'application/json' },
+    })
+    if (res.ok) {
+      const meta = await res.json()
+      const ver = meta['dist-tags']?.latest || meta['dist-tags']?.next
+      if (ver) return ver
+    }
+  } catch (e) {
+    console.warn('fetch npm registry failed:', e)
+  }
+
+  // 3. 兜底尝试 GitHub Releases
+  try {
+    const res = await fetch('https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+    if (res.ok) {
+      const rel = await res.json()
+      if (rel.tag_name) return rel.tag_name.replace(/^v/, '')
+    }
+  } catch (e) {
+    console.warn('fetch github releases failed:', e)
+  }
+
+  return null
 }
 
 async function refreshDshUpdate() {
@@ -233,10 +296,16 @@ async function refreshDshUpdate() {
   const cur = appInfo?.dshVersion
   const outdated = Boolean(latest && cur && latest !== cur)
   els.btnUpdate.disabled = !outdated || updating
-  els.btnUpdate.title = outdated
-    ? `官方 dsh 有新版本 ${latest}（当前 ${cur}），点击在线更新`
-    : (latest ? `官方 dsh 已是最新版本 ${latest}` : '无法连接 npm registry')
-  if (!outdated && els.btnUpdate.textContent !== '更新到最新') els.btnUpdate.textContent = '更新官方 dsh'
+  if (outdated) {
+    els.btnUpdate.textContent = `更新官方 dsh (v${latest})`
+    els.btnUpdate.title = `官方发布了新版本 ${latest}（当前 ${cur}），点击一键在线更新`
+  } else if (latest) {
+    els.btnUpdate.textContent = `官方 dsh 已是最新 (v${latest})`
+    els.btnUpdate.title = `官方仓库: https://github.com/deepseek-ai/deepseek-harness`
+  } else {
+    els.btnUpdate.textContent = '更新官方 dsh'
+    els.btnUpdate.title = '检查官方版本中…'
+  }
 }
 
 let updating = false
@@ -260,13 +329,90 @@ els.btnUpdate.addEventListener('click', async () => {
   }, 3000)
 })
 
+els.kvLatest.style.cursor = 'pointer'
+els.kvLatest.addEventListener('click', () => {
+  call('open_official_repo')
+})
+
+// ---- 工作区目录管理 --------------------------------------------------------
+els.btnPickWorkspace.addEventListener('click', async () => {
+  els.btnPickWorkspace.disabled = true
+  const dir = await call('pick_workspace_dir')
+  if (dir) {
+    await call('set_workspace', { path: dir })
+    await refresh()
+  }
+  els.btnPickWorkspace.disabled = false
+})
+
+els.btnOpenWorkspace.addEventListener('click', () => {
+  call('open_workspace_dir')
+})
+
+els.btnResetWorkspace.addEventListener('click', async () => {
+  if (confirm('确定要重置工作区为默认目录吗？（服务将自动重启生效）')) {
+    await call('reset_workspace')
+    await refresh()
+  }
+})
+
+// ---- 会话统计与备份清理 ----------------------------------------------------
+async function refreshSessionStats() {
+  const stats = await call('get_session_stats')
+  if (!stats) return
+  els.sessionStatBadge.textContent = `${stats.count} 个会话 · ${stats.size_formatted}`
+  if (stats.backup_count > 0) {
+    els.sessionStatBadge.title = `会话目录: ${stats.sessions_dir}\n已有 ${stats.backup_count} 个历史备份（存储于 backups/）`
+  } else {
+    els.sessionStatBadge.title = `会话目录: ${stats.sessions_dir}`
+  }
+}
+
+els.btnBackupSessions.addEventListener('click', async () => {
+  els.btnBackupSessions.disabled = true
+  els.btnBackupSessions.textContent = '备份中…'
+  const path = await call('backup_sessions')
+  if (path) {
+    els.btnBackupSessions.textContent = '备份完成！'
+    setTimeout(async () => {
+      els.btnBackupSessions.disabled = false
+      els.btnBackupSessions.textContent = '一键备份会话'
+      await refreshSessionStats()
+    }, 2000)
+  } else {
+    els.btnBackupSessions.disabled = false
+    els.btnBackupSessions.textContent = '一键备份会话'
+  }
+})
+
+let cleaningSessions = false
+els.btnCleanSessions.addEventListener('click', async () => {
+  if (cleaningSessions) return
+  if (!confirm('确定要清理历史会话缓存吗？\n（系统会在清理前自动在 backups 目录生成快照备份，安全防丢失）')) {
+    return
+  }
+  cleaningSessions = true
+  els.btnCleanSessions.disabled = true
+  els.btnCleanSessions.textContent = '清理中…'
+  const res = await call('clear_session_cache')
+  if (res) {
+    alert(res)
+  }
+  cleaningSessions = false
+  els.btnCleanSessions.disabled = false
+  els.btnCleanSessions.textContent = '清理历史缓存'
+  await refreshSessionStats()
+})
+
 // ---- boot ------------------------------------------------------------------
 async function boot() {
-  await Promise.all([loadInfo(), loadAutostart(), loadLocale()])
+  await Promise.all([loadInfo(), loadAutostart(), loadLocale(), refreshSessionStats()])
   await refresh()
   await refreshLogs()
   await refreshDshUpdate()
   setInterval(refresh, 1200)
   setInterval(refreshLogs, 2500)
+  setInterval(refreshSessionStats, 5000)
 }
 boot()
+

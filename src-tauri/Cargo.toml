@@ -1,6 +1,6 @@
 [package]
 name = "deepseek-harness-desktop-client"
-version = "1.0.1"
+version = "0.1.1"
 description = "DeepSeek Harness Desktop Client — a modern desktop client for DeepSeek Harness"
 authors = ["DeepSeek Harness Desktop Client contributors"]
 license = "MIT"

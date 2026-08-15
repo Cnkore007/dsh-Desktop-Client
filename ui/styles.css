@@ -110,6 +110,33 @@ body {
   white-space: pre-wrap;
 }
 
+.conflict-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.danger {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+button.danger:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+}
+
+button.secondary {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+button.secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
 .enter-hint {
   margin-top: 14px;
   background: rgba(77, 107, 254, 0.07);
@@ -238,4 +265,102 @@ button.ghost:hover:not(:disabled) { color: var(--ds-link); background: var(--ds-
   border-radius: 10px;
   font: inherit;
   color: inherit;
+}
+
+/* ── 工作区 ────────────────────────────────────────── */
+.workspace-kv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 70%;
+  justify-content: flex-end;
+}
+.workspace-kv code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+.ghost-sm {
+  background: transparent;
+  border: 1px solid var(--ds-border-soft);
+  color: var(--ds-text-secondary);
+  padding: 2px 8px;
+  font-size: 11.5px;
+  border-radius: var(--ds-radius-pill);
+  box-shadow: none;
+}
+.ghost-sm:hover:not(:disabled) {
+  background: var(--ds-brand-soft);
+  color: var(--ds-brand-deep);
+  border-color: rgba(77, 107, 254, 0.3);
+}
+
+/* ── 会话管理卡片 ──────────────────────────────────── */
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.card-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.card-desc {
+  color: var(--ds-text-description);
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+.session-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.danger-text {
+  color: #dc2626;
+}
+.danger-text:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+}
+
+/* ── Cordis 插件与 MCP 网格 ────────────────────────── */
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+.plugin-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--ds-radius-panel);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plugin-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+.plugin-desc {
+  font-size: 11.5px;
+  color: var(--ds-text-description);
+  line-height: 1.4;
+}
+.badge-mini {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 10.5px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+.badge-mini.ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.25);
 }

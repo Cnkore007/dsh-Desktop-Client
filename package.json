@@ -1,7 +1,7 @@
 {
   "name": "deepseek-harness-desktop-client",
   "private": true,
-  "version": "1.0.1",
+  "version": "0.1.1",
   "description": "DeepSeek Harness Desktop Client — a modern desktop client for DeepSeek Harness (original Tauri shell)",
   "scripts": {
     "tauri": "tauri",
@@ -11,6 +11,7 @@
     "fetch:node": "node scripts/fetch-node.mjs",
     "setup:runtime": "node scripts/prepare-runtime.mjs",
     "setup": "npm run fetch:node && npm run setup:runtime",
+    "prepare": "npm run setup",
     "bundle": "npm run setup && tauri build"
   },
   "devDependencies": {

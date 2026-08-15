@@ -42,11 +42,24 @@
           <div class="kv"><span>端口</span><code id="kv-port">—</code></div>
           <div class="kv"><span>进程 PID</span><code id="kv-pid">—</code></div>
           <div class="kv"><span>服务托管</span><code id="kv-managed">—</code></div>
-          <div class="kv"><span>dsh 版本</span><code id="kv-dsh">—</code></div>
-          <div class="kv"><span>官方最新版</span><code id="kv-latest">—</code></div>
+          <div class="kv"><span>dsh 当前版本</span><code id="kv-dsh">—</code></div>
+          <div class="kv"><span>官方最新版本</span><code id="kv-latest" title="点击在浏览器中打开官方 GitHub 仓库">—</code></div>
           <div class="kv"><span>数据目录</span><code id="kv-data">—</code></div>
+          <div class="kv">
+            <span>当前工作区</span>
+            <div class="workspace-kv">
+              <code id="kv-workspace" title="dsh Agent 当前执行工程目录">—</code>
+              <button id="btn-pick-workspace" class="ghost-sm" title="选择目标工程目录">选择</button>
+              <button id="btn-open-workspace" class="ghost-sm" title="在系统文件管理器中打开">打开</button>
+              <button id="btn-reset-workspace" class="ghost-sm" title="重置为默认目录">重置</button>
+            </div>
+          </div>
         </div>
         <div id="error-box" class="error-box hidden"></div>
+        <div id="conflict-actions" class="conflict-actions hidden">
+          <button id="btn-kill-restart" class="danger">终止占用进程并重新拉起</button>
+          <button id="btn-attach" class="secondary">接管现有服务</button>
+        </div>
         <div id="enter-hint" class="enter-hint hidden"></div>
       </section>
 
@@ -60,6 +73,18 @@
         <button id="btn-data">打开数据目录</button>
       </section>
 
+      <section class="card session-card">
+        <div class="card-head">
+          <h2>会话历史管理</h2>
+          <span id="session-stat-badge" class="badge">统计中…</span>
+        </div>
+        <p class="card-desc">会话数据与快照保存在 <code>~/.dsh/sessions</code>。支持一键导出备份至本地，或清理历史缓存（清理前自动生成快照备份）。</p>
+        <div class="session-actions">
+          <button id="btn-backup-sessions" class="secondary">一键备份会话</button>
+          <button id="btn-clean-sessions" class="ghost danger-text">清理历史缓存</button>
+        </div>
+      </section>
+
       <section class="card settings-card">
         <label class="switch-row">
           <span>
@@ -71,7 +96,7 @@
         <label class="switch-row">
           <span>
             <strong>服务端口</strong>
-            <small>端口被占用时自动改用空闲端口；自定义端口保存后自动重启服务生效</small>
+            <small>默认端口 3080；自定义端口保存后自动重启生效</small>
           </span>
           <span class="port-row">
             <input id="port" class="port-input" type="number" min="1024" max="65535" inputmode="numeric" />
@@ -89,6 +114,48 @@
             <option value="en">English</option>
           </select>
         </label>
+      </section>
+
+      <section class="card mcp-card">
+        <details class="ref-details">
+          <summary>Cordis 插件与 MCP 扩展生态看板</summary>
+          <div class="ref-body">
+            <p>DeepSeek Harness 基于 Cordis 微内核架构，内置强大的核心工具，并支持接入外部 MCP (Model Context Protocol) 服务与插件：</p>
+            <div class="plugin-grid">
+              <div class="plugin-item">
+                <span class="plugin-title"><code>@deepseek-ai/dsh-tool-bash</code></span>
+                <span class="plugin-desc">原生终端环境执行能力，支持长时间任务与后台进程</span>
+                <span class="badge-mini ok">已内置启用</span>
+              </div>
+              <div class="plugin-item">
+                <span class="plugin-title"><code>@deepseek-ai/dsh-tool-fs</code></span>
+                <span class="plugin-desc">文件树检视、代码精准编辑与正则全文检索</span>
+                <span class="badge-mini ok">已内置启用</span>
+              </div>
+              <div class="plugin-item">
+                <span class="plugin-title"><code>@deepseek-ai/dsh-tool-web</code></span>
+                <span class="plugin-desc">在线网络实时检索与网页内容深度抓取</span>
+                <span class="badge-mini ok">已内置启用</span>
+              </div>
+              <div class="plugin-item">
+                <span class="plugin-title"><code>@deepseek-ai/dsh-mcp-client</code></span>
+                <span class="plugin-desc">Model Context Protocol 客户端，支持接入外部工具协议</span>
+                <span class="badge-mini ok">已内置启用</span>
+              </div>
+            </div>
+            <h4>🔌 接入外部 MCP 服务器指引</h4>
+            <p>如需扩展外部 MCP 工具（例如 GitHub、PostgreSQL、Puppeteer 等），可在 <code>~/.dsh/settings.yaml</code> 中添加：</p>
+            <pre>mcp_servers:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "your_token_here"
+  filesystem:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/folder"]</pre>
+          </div>
+        </details>
       </section>
 
       <section class="card">

@@ -81,3 +81,72 @@ commands.allow = ["set_locale"]
 identifier = "allow-get-locale"
 description = "允许调用 get_locale 命令"
 commands.allow = ["get_locale"]
+
+[[permission]]
+identifier = "allow-kill-port-process"
+description = "允许调用 kill_port_process 命令"
+commands.allow = ["kill_port_process"]
+
+[[permission]]
+identifier = "allow-attach-port"
+description = "允许调用 attach_port 命令"
+commands.allow = ["attach_port"]
+
+[[permission]]
+identifier = "allow-check-official-dsh"
+description = "允许调用 check_official_dsh 命令"
+commands.allow = ["check_official_dsh"]
+
+[[permission]]
+identifier = "allow-open-official-repo"
+description = "允许调用 open_official_repo 命令"
+commands.allow = ["open_official_repo"]
+
+[[permission]]
+identifier = "allow-get-workspace"
+description = "允许调用 get_workspace 命令"
+commands.allow = ["get_workspace"]
+
+[[permission]]
+identifier = "allow-set-workspace"
+description = "允许调用 set_workspace 命令"
+commands.allow = ["set_workspace"]
+
+[[permission]]
+identifier = "allow-reset-workspace"
+description = "允许调用 reset_workspace 命令"
+commands.allow = ["reset_workspace"]
+
+[[permission]]
+identifier = "allow-pick-workspace-dir"
+description = "允许调用 pick_workspace_dir 命令"
+commands.allow = ["pick_workspace_dir"]
+
+[[permission]]
+identifier = "allow-open-workspace-dir"
+description = "允许调用 open_workspace_dir 命令"
+commands.allow = ["open_workspace_dir"]
+
+[[permission]]
+identifier = "allow-get-session-stats"
+description = "允许调用 get_session_stats 命令"
+commands.allow = ["get_session_stats"]
+
+[[permission]]
+identifier = "allow-backup-sessions"
+description = "允许调用 backup_sessions 命令"
+commands.allow = ["backup_sessions"]
+
+[[permission]]
+identifier = "allow-clear-session-cache"
+description = "允许调用 clear_session_cache 命令"
+commands.allow = ["clear_session_cache"]
+
+[[permission]]
+identifier = "allow-open-external-url"
+description = "允许在系统默认浏览器中打开外部链接"
+commands.allow = ["open_external_url"]
+
+
+
+
