@@ -11,3 +11,5 @@ src-tauri/gen/
 *.log
 *.dmg
 *.app
+AGENTS.md
+AUDIT.md
