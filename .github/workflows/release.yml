@@ -26,7 +26,7 @@ jobs:
             bundle_args: --bundles nsis
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            bundle_args: --bundles "deb,appimage"
+            bundle_args: --bundles deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -92,6 +92,7 @@ jobs:
 
   release:
     needs: build
+    if: always() && !cancelled() && contains(needs.build.result, 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write # 仅此 job 需要写 Release
