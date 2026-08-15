@@ -43,6 +43,10 @@ npm run bundle              # 构建发布版（产物在 src-tauri/target/relea
 > `dsh-web-frontend` 产物上（优先原生剪贴板 → `writeText` → `execCommand` 兜底），
 > 这是 macOS 复制按钮可用的关键之一；若上游 dsh 已内置该修复，补丁会自动跳过。
 
+## 🎨 设计
+
+视觉遵循 [deepseek.com](https://www.deepseek.com/) 的设计语言：品牌蓝 `#4d6bfe`、暖灰底 `#f9f8f8`、24px 圆角卡片、DM Sans + PingFang SC 字体栈、胶囊按钮与柔和阴影。
+
 ## 🏗️ 架构
 
 ```

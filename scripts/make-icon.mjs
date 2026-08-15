@@ -79,8 +79,8 @@ function bar(x, y, x0, y0, x1, y1, halfW) {
 // ---- render -----------------------------------------------------------------
 const px = Buffer.alloc(SIZE * SIZE * 4)
 const CX = SIZE / 2
-const c1 = [0x1e, 0x1b, 0x4b] // indigo-950
-const c2 = [0x6d, 0x28, 0xd9] // violet-700
+const c1 = [0x4d, 0x6b, 0xfe] // DeepSeek brand blue
+const c2 = [0x3a, 0x65, 0xc2] // DeepSeek brand deep
 const WHITE = [0xf8, 0xfa, 0xfc]
 
 for (let y = 0; y < SIZE; y++) {
