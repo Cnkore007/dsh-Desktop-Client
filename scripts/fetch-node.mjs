@@ -29,6 +29,7 @@ if (!/^v\d+\.\d+\.\d+$/.test(version)) {
 
 const PLATFORM = {
   darwin: { plat: 'darwin', ext: 'tar.gz', bin: 'node' },
+  linux: { plat: 'linux', ext: 'tar.gz', bin: 'node' },
   win32: { plat: 'win', ext: 'zip', bin: 'node.exe' },
 }
 const ARCH = { arm64: 'arm64', x64: 'x64' }
